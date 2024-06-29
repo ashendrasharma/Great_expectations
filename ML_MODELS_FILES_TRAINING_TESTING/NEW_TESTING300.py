@@ -10,13 +10,17 @@ import glob
 # Ensure the predictions directory exists
 os.makedirs('predictions', exist_ok=True)
 
-# Connect to MongoDB
-client = MongoClient('mongodb://intelliinvest:intelliinvest@67.211.219.52:27017/intelliinvest')
-db = client['intelliinvest']
-fundamentals_collection = db['STOCK_FUNDAMENTALS']
-signals_collection = db['STOCK_SIGNALS_COMPONENTS_10']
-details_collection = db['STOCK_DETAILS']
-predictions_collection = db['STOCK_PREDICTIONS']
+# Connect to MongoDB servers
+data_client = MongoClient('mongodb://intelliinvest:intelliinvest@67.211.219.52:27017/intelliinvest')
+save_client = MongoClient('mongodb://intelliinvest:intelliinvest@67.211.219.52:27017/intelliinvest')
+
+data_db = data_client['intelliinvest']
+save_db = save_client['intelliinvest']
+
+fundamentals_collection = data_db['STOCK_FUNDAMENTALS']
+signals_collection = data_db['STOCK_SIGNALS_COMPONENTS_10']
+details_collection = data_db['STOCK_DETAILS']
+predictions_collection = save_db['STOCK_PREDICTIONS']
 
 # Function to calculate RMSE
 def calculate_rmse(true_values, predictions):
@@ -57,17 +61,17 @@ model_types = ['lr', 'dt', 'gb']
 for industry in industries:
     for model_type in model_types:
         # Create the pattern to match files with the _{industry}.pkl suffix for the current model type
-        pattern = f'models/{model_type}_model_{industry}_*.pkl'
-        
+        pattern = f'models/{model_type}model{industry}_*.pkl'
+
         # Find files that match the pattern
         matched_files = glob.glob(pattern)
-        
+
         # Check if any files matched
         if matched_files:
             # Initialize a dictionary to hold models for each risk category in this industry and model type
             if industry not in industry_models:
                 industry_models[industry] = {'lr': {}, 'dt': {}, 'gb': {}}
-            
+
             # Open and load each matched file
             for file_to_open in matched_files:
                 try:
@@ -82,7 +86,7 @@ for industry in industries:
         else:
             print(f"No files found matching pattern: {pattern}")
 
-print("-"*50)            
+print("-"*50)
 print("-"*50)
 
 # Function to assign risk category based on stdDevOfReturn
@@ -164,9 +168,9 @@ for security_id in all_security_ids:
             lagged_date = last_date - timedelta(days=30)
         elif period == 'quarterly':
             lagged_date = last_date - timedelta(days=90)
-        
+
         lagged_data = df[df['signalDate'] == lagged_date.timestamp()]
-        
+
         if len(lagged_data) == 0:
             print(f"No historical data available for securityId: {security_id}, period: {period}, skipping.")
             continue
@@ -175,7 +179,7 @@ for security_id in all_security_ids:
         new_data['signalDate'] = date.timestamp()
         new_data = new_data.drop(columns=['closePrice'])
 
-        X_new = new_data.drop(columns=['signalDate', 'category', 'industry'])
+        X_new = new_data.drop(columns=['category', 'industry'])
 
         # Make predictions using the models for the matching risk category
         lr_predictions = models['lr'].predict(X_new)
